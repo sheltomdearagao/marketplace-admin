@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-// Substitua pelos seus dados do Supabase ou use variáveis de ambiente
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "SUA_SUPABASE_URL";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "SUA_SUPABASE_ANON_KEY";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -23,6 +22,12 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [linkGerado, setLinkGerado] = useState<{ [id: string]: string }>({});
   const [copiado, setCopiado] = useState<{ [id: string]: boolean }>({});
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<Partial<Vendedor>>({});
+  const [editId, setEditId] = useState<string | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     buscarVendedores();
@@ -46,7 +51,6 @@ export default function App() {
   }
 
   function gerarLink(vendedor: Vendedor) {
-    // Exemplo de link, ajuste conforme sua integração
     return `https://www.mercadopago.com.br/authorization?user_id=${vendedor.id}`;
   }
 
@@ -64,12 +68,79 @@ export default function App() {
     }
   }
 
+  function abrirFormAdicionar() {
+    setForm({ nome: "", email: "", status_integracao: "" });
+    setEditId(null);
+    setShowForm(true);
+  }
+
+  function abrirFormEditar(v: Vendedor) {
+    setForm({ nome: v.nome, email: v.email, status_integracao: v.status_integracao });
+    setEditId(v.id);
+    setShowForm(true);
+  }
+
+  async function handleSalvar(e: React.FormEvent) {
+    e.preventDefault();
+    setFormLoading(true);
+    if (!form.nome || !form.email) {
+      setFormLoading(false);
+      return;
+    }
+    if (editId) {
+      // Editar
+      const { error } = await supabase.from("vendedores").update({
+        nome: form.nome,
+        email: form.email,
+        status_integracao: form.status_integracao || null,
+      }).eq("id", editId);
+      if (!error) {
+        setShowForm(false);
+        buscarVendedores();
+      }
+    } else {
+      // Adicionar
+      const { error } = await supabase.from("vendedores").insert({
+        nome: form.nome,
+        email: form.email,
+        status_integracao: form.status_integracao || null,
+      });
+      if (!error) {
+        setShowForm(false);
+        setPagina(1);
+        buscarVendedores();
+      }
+    }
+    setFormLoading(false);
+  }
+
+  function handleCancelarForm() {
+    setShowForm(false);
+    setEditId(null);
+    setForm({});
+  }
+
+  function confirmarRemover(id: string) {
+    setDeleteId(id);
+  }
+
+  async function handleRemover() {
+    if (!deleteId) return;
+    setDeleteLoading(true);
+    const { error } = await supabase.from("vendedores").delete().eq("id", deleteId);
+    if (!error) {
+      setDeleteId(null);
+      buscarVendedores();
+    }
+    setDeleteLoading(false);
+  }
+
   const totalPaginas = Math.ceil(total / PAGE_SIZE);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center p-4">
       <div className="w-full max-w-4xl bg-white rounded-xl shadow-lg p-6 mt-6">
-        <h1 className="text-2xl font-bold mb-6 text-center text-blue-700">Painel de Parceiros</h1>
+        <h1 className="text-2xl font-bold mb-6 text-center text-blue-700">Painel de Vendedores</h1>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <input
             type="text"
@@ -82,7 +153,62 @@ export default function App() {
             }}
           />
           <span className="text-gray-500 text-sm">Total: {total}</span>
+          <button
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow text-sm"
+            onClick={abrirFormAdicionar}
+          >
+            + Novo Vendedor
+          </button>
         </div>
+        {/* Formulário de adicionar/editar */}
+        {showForm && (
+          <form onSubmit={handleSalvar} className="bg-gray-100 rounded-lg p-4 mb-6 flex flex-col gap-3 shadow-inner">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <input
+                type="text"
+                placeholder="Nome"
+                className="border rounded px-3 py-2 w-full"
+                value={form.nome || ""}
+                onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
+                required
+              />
+              <input
+                type="email"
+                placeholder="E-mail"
+                className="border rounded px-3 py-2 w-full"
+                value={form.email || ""}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                required
+              />
+              <select
+                className="border rounded px-3 py-2 w-full"
+                value={form.status_integracao || ""}
+                onChange={e => setForm(f => ({ ...f, status_integracao: e.target.value }))}
+              >
+                <option value="">Status</option>
+                <option value="ativo">Ativo</option>
+                <option value="pendente">Pendente</option>
+              </select>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold"
+                onClick={handleCancelarForm}
+                disabled={formLoading}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                disabled={formLoading}
+              >
+                {editId ? "Salvar" : "Adicionar"}
+              </button>
+            </div>
+          </form>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead>
@@ -91,16 +217,17 @@ export default function App() {
                 <th className="px-4 py-2 text-left font-semibold">E-mail</th>
                 <th className="px-4 py-2 text-left font-semibold">Status</th>
                 <th className="px-4 py-2 text-center font-semibold">Link Mercado Pago</th>
+                <th className="px-4 py-2 text-center font-semibold">Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-8 text-blue-500">Carregando...</td>
+                  <td colSpan={5} className="text-center py-8 text-blue-500">Carregando...</td>
                 </tr>
               ) : vendedores.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-8 text-gray-400">Nenhum vendedor encontrado.</td>
+                  <td colSpan={5} className="text-center py-8 text-gray-400">Nenhum vendedor encontrado.</td>
                 </tr>
               ) : (
                 vendedores.map((v) => (
@@ -135,6 +262,20 @@ export default function App() {
                         </>
                       )}
                     </td>
+                    <td className="px-4 py-2 text-center flex gap-2 justify-center">
+                      <button
+                        className="bg-yellow-400 hover:bg-yellow-500 text-white px-2 py-1 rounded text-xs font-semibold"
+                        onClick={() => abrirFormEditar(v)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs font-semibold"
+                        onClick={() => confirmarRemover(v.id)}
+                      >
+                        Remover
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -159,6 +300,31 @@ export default function App() {
             >
               Próxima
             </button>
+          </div>
+        )}
+        {/* Modal de confirmação de remoção */}
+        {deleteId && (
+          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 shadow-xl flex flex-col gap-4 min-w-[300px]">
+              <span className="text-lg font-semibold text-red-600">Remover vendedor?</span>
+              <span className="text-gray-700 text-sm">Essa ação não pode ser desfeita.</span>
+              <div className="flex gap-2 justify-end">
+                <button
+                  className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold"
+                  onClick={() => setDeleteId(null)}
+                  disabled={deleteLoading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-semibold"
+                  onClick={handleRemover}
+                  disabled={deleteLoading}
+                >
+                  Remover
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
