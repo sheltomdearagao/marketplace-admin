@@ -69,7 +69,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center p-4">
       <div className="w-full max-w-4xl bg-white rounded-xl shadow-lg p-6 mt-6">
-        <h1 className="text-2xl font-bold mb-6 text-center text-blue-700">Painel de Vendedores</h1>
+        <h1 className="text-2xl font-bold mb-6 text-center text-blue-700">Painel de Parceiros</h1>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <input
             type="text"
